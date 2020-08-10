@@ -1,16 +1,12 @@
 package com.lfmunoz.rabbit
 
-import ch.qos.logback.classic.Level
 import com.lfmunoz.utils.*
+import com.rabbitmq.client.ConnectionFactory
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.kotlin.await
-import org.junit.jupiter.api.AfterAll
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.api.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -26,23 +22,25 @@ class RabbitPublisherBareIntTest {
   private val testThreadPool = newFixedThreadPoolContext(4, "tThread")
   private lateinit var consumerJob: Job
   private lateinit var scope : CoroutineScope
+  private lateinit var connectionFactory: ConnectionFactory
 
   private val atomicInteger = AtomicInteger()
-  private val messageCount = 50_000
+  private val messageCount = 1_000
 
   private val rabbitConfig = RabbitConfig().apply {
-    queue.name = "consumer.test.queue"
-    exchange.name = "consumer.test.exchange"
+    queue.name = "publisher.test.queue"
+    exchange.name = "publisher.test.exchange"
   }
 
   //________________________________________________________________________________
   // BEFORE ALL / AFTER ALL
   //________________________________________________________________________________
-  @BeforeAll
+  @BeforeEach
   fun before() {
 //    changeLogLevel("com.lfmunoz.rabbit.RabbitPublisherBare", Level.DEBUG)
     atomicInteger.set(0)
     consumerJob = Job()
+    connectionFactory = RabbitAdminBare.buildConnectionFactory(rabbitConfig.amqp)
     scope = CoroutineScope(consumerJob + testThreadPool)
     scope.launch {
       startRabbitConsumer(rabbitConfig).collect {
@@ -51,7 +49,7 @@ class RabbitPublisherBareIntTest {
     }
   }
 
-  @AfterAll
+  @AfterEach
   fun after() {
     consumerJob.cancel()
   }
@@ -62,7 +60,7 @@ class RabbitPublisherBareIntTest {
   @Test
   fun `simple publish`() {
     runBlocking {
-      val publisher = RabbitPublisherBare(rabbitConfig.amqp, rabbitConfig.exchange)
+      val publisher = RabbitPublishBare(connectionFactory, rabbitConfig.exchange)
       repeat(messageCount) {
         val aGenericData = genericDataGenerator("$it")
         val ourByteArr = mapper.writeValueAsBytes(aGenericData)
@@ -80,7 +78,7 @@ class RabbitPublisherBareIntTest {
     val start = System.currentTimeMillis()
     val numberOfThreads = 4
     runBlocking {
-      val publisher = RabbitPublisherBare(rabbitConfig.amqp, rabbitConfig.exchange)
+      val publisher = RabbitPublishBare(connectionFactory, rabbitConfig.exchange)
       repeat(numberOfThreads) { _ ->
         Thread() {
           repeat(messageCount/numberOfThreads) {
@@ -103,10 +101,10 @@ class RabbitPublisherBareIntTest {
   private fun startRabbitConsumer(rabbitConfig: RabbitConfig) : Flow<GenericData> {
     val consumer = RabbitConsumerBare(
       "testBasicConsumer",
-      rabbitConfig.amqp,
-      rabbitConfig.queue,
-      rabbitConfig.exchange
+      connectionFactory,
+      rabbitConfig.queue
     )
+    consumer.queueBind(rabbitConfig.exchange)
     return consumer.consumeFlow().map {
       return@map mapper.readValue(it.body, GenericData::class.java)
     }

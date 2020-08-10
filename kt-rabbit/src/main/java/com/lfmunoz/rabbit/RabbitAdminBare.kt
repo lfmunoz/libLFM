@@ -6,42 +6,67 @@ import com.rabbitmq.client.ConnectionFactory
 import org.fissore.slf4j.FluentLoggerFactory
 import org.slf4j.LoggerFactory
 
-class RabbitAdminBare(
-  private val amqp: String = "amqp://guest:guest@localhost:5672"
-) {
+class RabbitAdminBare {
 
   companion object {
     private val log = FluentLoggerFactory.getLogger(RabbitAdminBare::class.java)
-  }
+    private const val queueIsExclusive: Boolean = false
 
-  val factory: ConnectionFactory = ConnectionFactory().apply {
-    setUri(amqp)
-    // Attempt recovery every 5 seconds
-    isAutomaticRecoveryEnabled = true
-  }
-
-  private fun createExchange(aChannel: Channel, exchangeName: String) {
-    aChannel.exchangeDeclare(exchangeName, "fanout", false)
-    log.info().log("[EXCHANGE CREATED] - exchange=$exchangeName")
-  }
-
-  /*
-  fun createQueue() {
-    val queueArgs: Map<String, Any> = mutableMapOf()
-    if (queueConfig.messageTtl != 0) {
-      queueArgs.plus("x-message-ttl" to queueConfig.messageTtl)
+    fun buildConnectionFactory(
+      uri: String
+    ): ConnectionFactory {
+      return ConnectionFactory().apply {
+        setUri(uri)
+        // Attempt recovery every 5 seconds
+        isAutomaticRecoveryEnabled = true
+      }
     }
-    if (queueConfig.maxLength != 0) {
-      queueArgs.plus("x-max-length" to queueConfig.maxLength)
+
+    fun buildConnectionFactory(
+      _userName: String,
+      _password: String,
+      _host: String,
+      _virtualHost: String
+    ): ConnectionFactory {
+      return ConnectionFactory().apply {
+        username = _userName
+        password = _password
+        host = _host
+        virtualHost = _virtualHost
+        // Attempt recovery every 5 seconds
+        isAutomaticRecoveryEnabled = true
+      }
     }
-    rabbitChannel.exchangeDeclare(exchangeConfig.name, exchangeConfig.type, exchangeConfig.durable)
-    val queueOk = rabbitChannel.queueDeclare(queueConfig.name, queueConfig.durable,
-      RabbitConsumerBare.queueIsExclusive, queueConfig.autoDelete, queueArgs)
-    rabbitChannel.queueBind(queueOk.queue, exchangeConfig.name, "")
-    RabbitConsumerBare.log.info("[QUEUE CREATED] - queue=${queueConfig}")
-  }
 
-   */
 
+    fun createExchangeAndBindQueue(
+      rabbitChannel: Channel,
+      queueConfig: RabbitQueueConfig,
+      exchangeConfig: RabbitExchangeConfig
+    ) {
+      createExchange(rabbitChannel, exchangeConfig)
+      createQueue(rabbitChannel, queueConfig)
+      rabbitChannel.queueBind(queueConfig.name, exchangeConfig.name, "")
+    }
+
+    fun createExchange(aChannel: Channel, exchangeConfig: RabbitExchangeConfig) {
+      aChannel.exchangeDeclare(exchangeConfig.name, exchangeConfig.type, exchangeConfig.durable)
+      log.info().log("[EXCHANGE CREATED] - exchange=${exchangeConfig.name}")
+    }
+
+    fun createQueue(rabbitChannel: Channel, queueConfig: RabbitQueueConfig) {
+      val queueArgs: Map<String, Any> = mutableMapOf()
+      if (queueConfig.messageTtl != 0) {
+        queueArgs.plus("x-message-ttl" to queueConfig.messageTtl)
+      }
+      if (queueConfig.maxLength != 0) {
+        queueArgs.plus("x-max-length" to queueConfig.maxLength)
+      }
+      val queueOk = rabbitChannel.queueDeclare(queueConfig.name, queueConfig.durable,
+        queueIsExclusive, queueConfig.autoDelete, queueArgs)
+      log.info().log("[QUEUE CREATED] - queue=${queueConfig}")
+    }
+
+  } // end of companion object
 
 }

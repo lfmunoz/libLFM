@@ -1,6 +1,7 @@
 package com.lfmunoz.rabbit
 
 import com.google.common.io.ByteStreams
+import com.lfmunoz.rabbit.RabbitAdminBare.Companion.createQueue
 import com.lfmunoz.utils.Compression
 import com.lfmunoz.utils.CompressionUtil
 import com.lfmunoz.utils.FastByteArrayInputStream
@@ -22,16 +23,12 @@ import javax.annotation.concurrent.ThreadSafe
 @ThreadSafe
 class RabbitConsumerBare(
         private val consumerTag: String, // unique identifier of consumer
-        var amqp: String = "amqp://guest:guest@localhost:5672",
-        var queueConfig: RabbitQueueConfig = RabbitQueueConfig(),
-        var exchangeConfig: RabbitExchangeConfig = RabbitExchangeConfig(),
-        var compression: String = "NONE"
+        private val connectionFactory: ConnectionFactory,
+        private val queueConfig: RabbitQueueConfig
 ) {
 
     companion object {
         private val log = LoggerFactory.getLogger(RabbitConsumerBare::class.java)
-        private const val queueIsExclusive: Boolean = false
-
         // Required to be false for QoS, we will manually acknowledge batches of messages
         private const val autoAck: Boolean = false
 
@@ -41,7 +38,6 @@ class RabbitConsumerBare(
         }
     }
 
-    private val factory: ConnectionFactory
     private var rabbitConnection: Connection
     // Each Channel has its own dispatch thread.
     // For the most common use case of one Consumer per Channel, this means
@@ -50,15 +46,10 @@ class RabbitConsumerBare(
     private val rabbitChannel: Channel
 
     init {
-        log.info("[CONSUMER CONNECT] tag=$consumerTag - uri=${amqp}")
-        factory = ConnectionFactory().apply {
-            setUri(amqp)
-            // Attempt recovery every 5 seconds
-            isAutomaticRecoveryEnabled = true
-        }
-        rabbitConnection = factory.newConnection()
+        log.info("[NEW CONSUMER CONNECTION] tag=$consumerTag")
+        rabbitConnection = connectionFactory.newConnection()
         rabbitChannel = rabbitConnection.createChannel()
-        createQueue()
+        createQueue(rabbitChannel, queueConfig) // idempotent
         // Accepts prefetchSize unack-ed message at a time
         rabbitChannel.basicQos(queueConfig.prefetch)
     }
@@ -128,19 +119,8 @@ class RabbitConsumerBare(
     // ________________________________________________________________________________
     // PRIVATE
     // ________________________________________________________________________________
-    private fun createQueue() {
-        val queueArgs: Map<String, Any> = mutableMapOf()
-        if (queueConfig.messageTtl != 0) {
-            queueArgs.plus("x-message-ttl" to queueConfig.messageTtl)
-        }
-        if (queueConfig.maxLength != 0) {
-            queueArgs.plus("x-max-length" to queueConfig.maxLength)
-        }
-        rabbitChannel.exchangeDeclare(exchangeConfig.name, exchangeConfig.type, exchangeConfig.durable)
-        val queueOk = rabbitChannel.queueDeclare(queueConfig.name, queueConfig.durable,
-        queueIsExclusive, queueConfig.autoDelete, queueArgs)
-        rabbitChannel.queueBind(queueOk.queue, exchangeConfig.name, "")
-        log.info("[QUEUE CREATED] - queue=${queueConfig}")
+    fun queueBind(exchangeConfig: RabbitExchangeConfig) {
+      rabbitChannel.queueBind(queueConfig.name, exchangeConfig.name, "")
     }
 
 } // end of RabbitConsumerBare

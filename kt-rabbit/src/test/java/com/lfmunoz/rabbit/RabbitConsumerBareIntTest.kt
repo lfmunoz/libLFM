@@ -1,22 +1,15 @@
 package com.lfmunoz.rabbit
 
-import com.fasterxml.jackson.module.kotlin.readValue
 import com.lfmunoz.utils.GenericData
-import com.lfmunoz.utils.changeLogLevel
 import com.lfmunoz.utils.genericDataGenerator
-import org.junit.jupiter.api.Assertions.*
 import com.lfmunoz.utils.mapper
+import com.rabbitmq.client.ConnectionFactory
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.*
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.*
-import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Integration Test:  Rabbit Consumer
@@ -27,79 +20,70 @@ import java.util.concurrent.atomic.AtomicLong
 class RabbitConsumerBareIntTest {
 
   // Dependencies
-  private val testThreadPool = newFixedThreadPoolContext(4, "consumerThread")
+  private val testThreadPool = newFixedThreadPoolContext(4, "tThread")
+  private lateinit var consumerJob: Job
+  private lateinit var scope : CoroutineScope
+  private lateinit var connectionFactory: ConnectionFactory
+
+  private val messageCount = 5_000
+  private val rabbitConfig = RabbitConfig().apply {
+    queue.name = "consumer.test.queue"
+    exchange.name = "consumer.test.exchange"
+  }
+
 
   //________________________________________________________________________________
   // BEFORE ALL / AFTER ALL
   //________________________________________________________________________________
-  @BeforeAll
+  @BeforeEach
   fun before() {
-    changeLogLevel("org.apache.kafka.clients.producer.ProducerConfig")
+    // changeLogLevel("com.lfmunoz.rabbit.RabbitPublisherBare", Level.DEBUG)
+    consumerJob = Job()
+    scope = CoroutineScope(consumerJob + testThreadPool)
+    connectionFactory = RabbitAdminBare.buildConnectionFactory(rabbitConfig.amqp)
   }
 
-  private val messageCount = 50
-
-
-  val config = RabbitConfig().apply {
-    queue.name = "consumer.test.queue"
-    exchange.name = "consumer.test.exchange"
+  @AfterEach
+  fun after() {
+    consumerJob.cancel()
   }
+
   //________________________________________________________________________________
   // Tests
   //________________________________________________________________________________
   @Test
-  fun `simple publish and consume`() {
+  fun `multi-thread consume`() {
     runBlocking {
-      val latch = CountDownLatch(messageCount)
+      // PUBLISHER
+      val publisher = RabbitPublishBare(connectionFactory, rabbitConfig.exchange)
+      RabbitAdminBare.createExchange(publisher.rabbitChannel, rabbitConfig.exchange)
 
       // CONSUMER
+      val latch = CountDownLatch(messageCount)
       val consumer = RabbitConsumerBare(
-      "testBasicConsumer",
-        config.amqp,
-        config.queue,
-        config.exchange
+        "testBasicConsumer",
+        connectionFactory,
+        rabbitConfig.queue
       )
+      consumer.queueBind(rabbitConfig.exchange)
+      consumer.consumeFlow().map {
+        return@map mapper.readValue(it.body, GenericData::class.java)
+      }.onEach {
+        // println("${Thread.currentThread().name}")
+        latch.countDown()
+      }.launchIn(scope)
 
-      launch(testThreadPool) {
-        consumer.consumeChannelWithCallback {
-          val listOfGenericData : GenericData = mapper.readValue(it, GenericData::class.java)
-          println(listOfGenericData)
-          latch.countDown()
-        }
+      // SEND MESSAGES
+      repeat(messageCount) {
+        val aGenericData = genericDataGenerator("key=$it", 1_000)
+        val ourByteArr = mapper.writeValueAsBytes(aGenericData)
+        publisher.publish(ourByteArr)
       }
 
-      // PUBLISHER
-      val publisher = RabbitPublisherBare( config.amqp, config.exchange)
-
-      println("C")
-      launch(testThreadPool) {
-        repeat(messageCount) {
-          val aGenericData = genericDataGenerator("$it")
-          println(aGenericData)
-          val ourByteArr = mapper.writeValueAsBytes(aGenericData)
-          publisher.publish(ourByteArr)
-        }
-      }
-
-      println("Y")
-      // ASSERTIONS
-      assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue()
-      println("Z")
-      consumer.shutdown()
-      publisher.shutdown()
+      assertThat(latch.await(15, TimeUnit.SECONDS)).isTrue()
 
     } // end of runBlcoking
   } // end of Test Case
-
-  @Test
-  fun `multi-thread publish and consume`() {
-
-  }
-
-
-  //________________________________________________________________________________
-  // Helper methods
-  //________________________________________________________________________________
 
 
 

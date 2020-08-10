@@ -1,7 +1,7 @@
 package com.lfmunoz.rabbit
 
-import com.rabbitmq.client.BasicProperties
 import java.io.Serializable
+import com.rabbitmq.client.AMQP.BasicProperties
 
 //________________________________________________________________________________
 // RABBIT CONFIG

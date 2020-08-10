@@ -2,6 +2,7 @@ package com.lfmunoz.rabbit
 
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
+import com.lfmunoz.rabbit.RabbitAdminBare.Companion.createExchange
 import com.lfmunoz.utils.createSingleThreadExecutor
 import com.rabbitmq.client.*
 import kotlinx.coroutines.*
@@ -22,37 +23,34 @@ import javax.annotation.concurrent.ThreadSafe
  *      https://www.rabbitmq.com/tutorials/tutorial-seven-java.html
  */
 @ThreadSafe
-class RabbitPublisherBare(
-  var amqp: String = "amqp://guest:guest@localhost:5672",
-  var exchangeConfig: RabbitExchangeConfig = RabbitExchangeConfig(),
-  var compression: String = "NONE"
+class RabbitPublishBare(
+  private val connectionFactory: ConnectionFactory,
+  private val exchangeConfig: RabbitExchangeConfig
 ) {
   companion object {
-    private val log = FluentLoggerFactory.getLogger(RabbitPublisherBare::class.java)
+    private val log = FluentLoggerFactory.getLogger(RabbitPublishBare::class.java)
   }
 
   private val threadContext  = newSingleThreadContext("pThread-${(10..99).random()}")
   private val scope = CoroutineScope(threadContext)
   private val publishChannel: kotlinx.coroutines.channels.Channel<ByteArray> = kotlinx.coroutines.channels.Channel(8)
 
-  private val factory: ConnectionFactory = ConnectionFactory()
   private val connection: Connection
   // Sharing Channel instances between threads is something to be avoided
   // Concurrent publishing on a shared channel can result in incorrect frame interleaving on the wire,
   //  triggering a connection-level protocol exception and immediate connection closure by the broker.
   // Sharing channels between threads will also interfere with Publisher Confirms.
   // Concurrent publishing on a shared channel is best avoided entirely, e.g. by using a channel per thread.
-  private val rabbitChannel: Channel
+  val rabbitChannel: Channel
 
   // ________________________________________________________________________________
   // PUBLIC
   // ________________________________________________________________________________
   init {
-    log.info().log("[PUBLISHER CONNECT] - amqp=$amqp exchange=${exchangeConfig.name}")
-    factory.setUri(amqp)
-    connection = factory.newConnection()
+    log.info().log("[NEW PUBLISHER CONNECTION] - exchange=${exchangeConfig.name}")
+    connection = connectionFactory.newConnection()
     rabbitChannel = connection.createChannel()
-    createExchange(rabbitChannel, exchangeConfig.name)
+    createExchange(rabbitChannel, exchangeConfig) // idempotent
     scope.launch {
       for(byteArray in publishChannel) {
         rabbitChannel.basicPublish(exchangeConfig.name, "", byteArrayRabbitMessage, byteArray)
@@ -75,12 +73,6 @@ class RabbitPublisherBare(
   // ________________________________________________________________________________
   // PRIVATE
   // ________________________________________________________________________________
-  private fun createExchange(aChannel: Channel?, exchangeName: String) {
-    aChannel?.exchangeDeclare(exchangeName, "fanout", false)
-      ?: throw RuntimeException("[EXCHANGE DECLARE] - channel is null")
-    log.info().log("[EXCHANGE CREATED] - exchange=$exchangeName")
-  }
-
   private val byteArrayRabbitMessage: AMQP.BasicProperties =
     AMQP.BasicProperties.Builder()
       .contentType("application/octet-stream")
