@@ -19,7 +19,7 @@ class KafkaPublisherBare {
   companion object {
     private val log = FluentLoggerFactory.getLogger(KafkaPublisherBare::class.java)
 
-    suspend fun connect(aKafkaConfig: KafkaConfig, aFlow: Flow<KafkaMessage>) = flow<KafkaPublisherResult> {
+    fun connect(aKafkaConfig: KafkaConfig, aFlow: Flow<KafkaMessage>) = flow<KafkaPublisherResult> {
       // The producer is thread safe and sharing a single producer instance across threads will generally be faster than
       // having multiple instances.
       log.info().log("[kafka producer connecting] - {}", aKafkaConfig)
@@ -48,6 +48,7 @@ class KafkaPublisherBare {
       props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, aKafkaConfig.bootstrapServer)
       props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, serializer)
       props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, serializer)
+      props.setProperty(ProducerConfig.COMPRESSION_TYPE_CONFIG, aKafkaConfig.compression)
       return props
     }
 

@@ -1,5 +1,6 @@
 package com.lfmunoz.utils
 
+import com.fasterxml.jackson.module.kotlin.readValue
 import java.time.Instant
 
 val charPool : List<Char> = ('a'..'z') + ('A'..'Z') + ('0'..'9')
@@ -14,7 +15,12 @@ data class GenericData(
 ) {
   companion object {
     val listType =  mapper.typeFactory.constructCollectionType(List::class.java, GenericData::class.java)
+    fun fromJson(json: String) = mapper.readValue<GenericData>(json)
+    fun fromByteArray(iBytes: ByteArray) = mapper.readValue<GenericData>(iBytes)
   }
+
+  fun toJson(): String = mapper.writeValueAsString(this)
+  fun toByteArray(): ByteArray = mapper.writeValueAsBytes(this)
 }
 
 

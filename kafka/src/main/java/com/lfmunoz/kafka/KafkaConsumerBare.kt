@@ -12,24 +12,27 @@ import java.time.Duration
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 
+/**
+ *  Static KafkaConsumer that returns a flow you can collect
+ */
 class KafkaConsumerBare {
 
   companion object {
     private val log = FluentLoggerFactory.getLogger(KafkaConsumerBare::class.java)
 
-    fun connect(aKafkaConfig: KafkaConfig, isLooping: AtomicBoolean): Flow<KafkaMessage> {
+    fun connect(aKafkaConfig: KafkaConfig): Flow<KafkaMessage> {
       // NOT thread-safe -  All network I/O happens in the thread of the application making the call.
       //  More consumers means more TCP connections to the cluster (one per thread).
       log.info().log("[kafka consumer connecting] - {}", aKafkaConfig)
       val aKafkaConsumer = KafkaConsumer<ByteArray, ByteArray>(props(aKafkaConfig))
       aKafkaConsumer.subscribe(listOf(aKafkaConfig.topic))
-      return consumerFlow(aKafkaConsumer, isLooping)
+      return consumerFlow(aKafkaConsumer)
     }
 
-    private fun consumerFlow(aKafkaConsumer: KafkaConsumer<ByteArray, ByteArray>, isLooping: AtomicBoolean): Flow<KafkaMessage> {
+    private fun consumerFlow(aKafkaConsumer: KafkaConsumer<ByteArray, ByteArray>): Flow<KafkaMessage> {
       return flow {
         try {
-          while (isLooping.get()) {
+          while (true) {
             val record = aKafkaConsumer.poll(Duration.ofMillis(200))
             record.forEach {
               log.trace().log("[received kafka record] - {}", it)
@@ -40,26 +43,6 @@ class KafkaConsumerBare {
           log.info().withCause(e).log("[CancellationException] - aborted")
         } catch (e: WakeupException ) {
           log.info().withCause(e).log("[WakeupException] - shutdown signal")
-        } catch (e: Exception) {
-          log.error().withCause(e).log("[kafka consumer error] - captured exception")
-        } finally {
-          aKafkaConsumer.close()
-        }
-      }
-    }
-
-    private fun limitedConsumerFlow(count: Int, aKafkaConsumer: KafkaConsumer<ByteArray, ByteArray>): Flow<KafkaMessage> {
-      return flow {
-        try {
-          repeat(count) {
-            val record = aKafkaConsumer.poll(Duration.ofMillis(100))
-            record.forEach {
-              log.trace().log("[received kafka record] - {}", it)
-              emit(KafkaMessage(it.key(), it.value()))
-            }
-          }
-        } catch (e: WakeupException) {
-          log.info().withCause(e).log("[wakeupException] - shutdown signal")
         } catch (e: Exception) {
           log.error().withCause(e).log("[kafka consumer error] - captured exception")
         } finally {
