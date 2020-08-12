@@ -1,6 +1,7 @@
-rootProject.name = "flink-pipeline"
-include("flink-monitor")
-include("flink-jobs")
+rootProject.name = "rocker"
 
-include("kt-rabbit")
+include("rabbit")
+include("common")
+include("kafka")
+
 

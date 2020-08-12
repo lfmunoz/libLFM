@@ -5,7 +5,7 @@ USER = $(shell whoami)
 USER_ID = $(shell id -u ${USER})
 DIR = ${CURDIR}
 RND ?= 12345678
-NETWORK ?= flink-bridge-${RND}
+NETWORK ?= rocket-bridge-${RND}
 
 KAFKA_IP ?= 192.168.0.101
 
