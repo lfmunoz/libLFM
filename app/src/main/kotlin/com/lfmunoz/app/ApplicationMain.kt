@@ -1,7 +1,10 @@
-package com.lfmunoz.web
+package com.lfmunoz.app
 
 import com.lfmunoz.bash.BashService
 import com.lfmunoz.flink.web.*
+import com.lfmunoz.web.ActionInterface
+import com.lfmunoz.web.AppConfig
+import com.lfmunoz.web.WsPacketType
 import com.lfmunoz.web.actions.test.TestAction
 import com.lfmunoz.web.http.HttpVerticle
 import com.lfmunoz.web.ws.OurWSConnection
@@ -25,8 +28,8 @@ fun main() {
   val aAppConfig = AppConfig()
   println(aAppConfig)
 
-  startWs(vertx, aAppConfig)
-  startHttp(vertx, aAppConfig)
+    startWs(vertx, aAppConfig)
+    startHttp(vertx, aAppConfig)
 
 }
 

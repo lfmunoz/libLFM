@@ -8,13 +8,17 @@ import io.vertx.core.eventbus.EventBus
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.RoutingContext
 import io.vertx.ext.web.handler.BodyHandler
+import io.vertx.ext.web.handler.StaticHandler
 import io.vertx.kotlin.coroutines.CoroutineVerticle
 import org.fissore.slf4j.FluentLoggerFactory
 
 /**
  *
  */
-class HttpVerticle(private val aAppConfig: AppConfig) : CoroutineVerticle() {
+class HttpVerticle(
+  private val aAppConfig: AppConfig
+) : CoroutineVerticle() {
+
   companion object {
     private val LOG = FluentLoggerFactory.getLogger(HttpVerticle::class.java)
   }
@@ -27,7 +31,10 @@ class HttpVerticle(private val aAppConfig: AppConfig) : CoroutineVerticle() {
     eb = vertx.eventBus()
     val router = Router.router(vertx)
     router.route().handler(BodyHandler.create())
-    router.get("/").handler (rootEndpoint())
+    router.get("/private").handler (rootEndpoint())
+    router.route("/*").handler(StaticHandler.create(aAppConfig.rootDir).setCachingEnabled(false));
+
+
     vertx.createHttpServer().requestHandler(router).listen(aAppConfig.httpPort)
   }
 

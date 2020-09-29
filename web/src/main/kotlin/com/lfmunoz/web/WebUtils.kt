@@ -17,7 +17,8 @@ interface ActionInterface {
 // ________________________________________________________________________________
 data class AppConfig (
  val httpPort: Int = 8080,
- val wsPort: Int = 1991
+ val wsPort: Int = 1991,
+ val rootDir: String = "webapp/dist"
 )
 
 // ________________________________________________________________________________

@@ -20,6 +20,8 @@ local.properties
 .loadpath
 .recommenders
 
+webapp/dist/
+
 # External tool builders
 .externalToolBuilders/
 

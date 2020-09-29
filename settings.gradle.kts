@@ -8,5 +8,7 @@ include("consul")
 include("git")
 include("web")
 
+include("app")
+
 
 

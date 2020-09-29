@@ -1,7 +1,5 @@
 package com.lfmunoz.fdb
 
-
-
 import com.apple.foundationdb.FDB
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*

@@ -5,6 +5,9 @@ run:
 unit:
 	npm run test:unit
 
+build:
+	npm run build
+
 integ:
 	npm run test:integ
 
