@@ -121,8 +121,8 @@ class KafkaIntTest {
 
 
   //________________________________________________________________________________
-// Helper methods
-//________________________________________________________________________________
+  // Helper methods
+  //________________________________________________________________________________
   private fun generateKafkaMessage(id: Long): KafkaMessage {
     val aGenericData = genericDataGenerator("key=${id}")
     return KafkaMessage(

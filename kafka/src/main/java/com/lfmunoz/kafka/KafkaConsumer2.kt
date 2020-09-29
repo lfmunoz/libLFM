@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * https://kafka.apache.org/documentation/
  */
+@Deprecated("Use KafkaConsumerBare")
 class KafkaConsumer2(
   private val aKafkaConfig: KafkaConfig
 ) {

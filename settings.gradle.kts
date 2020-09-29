@@ -6,5 +6,7 @@ include("kafka")
 include("foundationdb")
 include("consul")
 include("git")
+include("web")
+
 
 
