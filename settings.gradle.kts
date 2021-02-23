@@ -7,6 +7,7 @@ include("foundationdb")
 include("consul")
 include("git")
 include("web")
+include("influxdb")
 
 include("app")
 

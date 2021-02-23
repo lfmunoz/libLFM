@@ -162,3 +162,12 @@ test:
 prod:
 	 docker exec -it kafka-${RND} bin/kafka-console-producer.sh --broker-list kafkaNet:9092 --topic my-topic
 
+
+
+
+kafka-ui:
+	docker run -d --rm  --network=${NETWORK} -p 9000:9000 \
+    -e KAFKA_BROKERCONNECT=kafka-${RND}:9092 \
+    -e JVM_OPTS="-Xms32M -Xmx64M" \
+    -e SERVER_SERVLET_CONTEXTPATH="/" \
+    obsidiandynamics/kafdrop
